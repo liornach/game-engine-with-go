@@ -1,21 +1,15 @@
 # ----------------------------------------------------------------------------
 # 1. Ignore Linux-style executables (no file extension)
 # ----------------------------------------------------------------------------
-# Ignore files with no dots in the name (commonly Go-built binaries)
-# Does not ignore directories
-# NOTE: Git cannot detect if a file is executable; this is a best-effort
-# Ignore all files with no extension
-[^./]*
+# Ignore files in any directory that have no dots (roughly: no extension)
+**/[^.]*
 
 # Do not ignore directories or dotfiles
-!*/
+!**/
 !.*
-
 
 # ----------------------------------------------------------------------------
 # 2. Go build artifacts
-# ----------------------------------------------------------------------------
-# Go build cache and compiled object files
 *.exe
 *.exe~
 *.dll
@@ -24,43 +18,26 @@
 *.test
 *.out
 
-# Unit test binaries created by "go test -c"
-*.test
-
 # ----------------------------------------------------------------------------
 # 3. Dependency management
-# ----------------------------------------------------------------------------
-# Go Modules & Sum files are tracked, but vendor dir can be ignored (optional)
 vendor/
-
-# If you're using go workspaces
 go.work
 go.work.sum
 
 # ----------------------------------------------------------------------------
 # 4. IDEs and editors
-# ----------------------------------------------------------------------------
-# VSCode
 .vscode/
-
-# JetBrains (GoLand, IntelliJ, etc.)
 .idea/
-
-# Emacs
 *~
-
-# Vim
 *.swp
 *.swo
 .swn
 
 # ----------------------------------------------------------------------------
 # 5. System files
-# ----------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 
 # ----------------------------------------------------------------------------
 # 6. Logs and debug
-# ----------------------------------------------------------------------------
 *.log
