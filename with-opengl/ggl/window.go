@@ -13,7 +13,7 @@ type gwin struct {
 	win *glfw.Window
 }
 
-func init() {
+func initGlfw() {
 	//runtime.LockOSThread()
 
 	log("trying to initialize glfw")
@@ -45,6 +45,8 @@ func log(s string, a ...any) {
 }
 
 func NewGwin(w int, h int, title string) *gwin {
+	initGlfw()
+
 	g := &gwin{
 		win: nil,
 	}
