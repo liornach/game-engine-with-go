@@ -37,7 +37,7 @@ func TestGetWidth(t *testing.T) {
 	g := newTestGwin()
 	defer g.Term()
 	exp := getTestWidth()
-	res := g.GetWidth()
+	res := g.Width()
 	assert(exp, res, t)
 }
 
@@ -45,7 +45,7 @@ func TestGetHeight(t *testing.T) {
 	g := newTestGwin()
 	defer g.Term()
 	exp := getTestHeight()
-	res := g.GetHeight()
+	res := g.Height()
 	assert(exp, res, t)
 }
 

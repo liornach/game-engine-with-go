@@ -33,6 +33,9 @@ func initGlfw() {
 
 	log("set window visibility hint to %s", visstr)
 	glfw.WindowHint(glfw.Visible, vis)
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 
 	log("glfwgl package is initialized")
 }
@@ -61,12 +64,12 @@ func NewGwin(w int, h int, title string) *gwin {
 	return g
 }
 
-func (g *gwin) GetWidth() int {
+func (g *gwin) Width() int {
 	w, _ := g.win.GetSize()
 	return w
 }
 
-func (g *gwin) GetHeight() int {
+func (g *gwin) Height() int {
 	_, h := g.win.GetSize()
 	return h
 }
@@ -81,11 +84,12 @@ func (g *gwin) Hide() {
 
 func (g *gwin) IsVis() bool {
 	vis := g.win.GetAttrib(glfw.Visible)
-	if vis == glfw.False {
+	switch vis {
+	case glfw.False:
 		return false
-	} else if vis == glfw.True {
+	case glfw.True:
 		return true
-	} else {
+	default:
 		estr := fmt.Sprintf("unknown integer returned from GetAttrib (visibility) : %d", vis)
 		panic(estr)
 	}
@@ -93,4 +97,8 @@ func (g *gwin) IsVis() bool {
 
 func (g *gwin) Term() {
 	glfw.Terminate()
+}
+
+func (g *gwin) MakeContextCurrent() {
+	g.win.MakeContextCurrent()
 }
