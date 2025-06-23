@@ -2,7 +2,7 @@
 # 1. Ignore Linux-style executables (no file extension)
 # ----------------------------------------------------------------------------
 # Ignore files in any directory that have no dots (roughly: no extension)
-**/[^.]*
+*
 
 # Do not ignore directories or dotfiles
 !**/
