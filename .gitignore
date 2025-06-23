@@ -1,23 +1,26 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
+# ----------------------------------------------------------------------------
+# 1. Ignore Linux-style executables (no extension)
+# ----------------------------------------------------------------------------
+# Ignore all files
+*
+# But NOT directories or dotfiles
+!*/
+!.gitignore
 
-# Output of `go run`
-*.run
+# ----------------------------------------------------------------------------
+# 2. Include Go source files and project files
+!*.go
+!go.mod
+!go.sum
+!go.work
+!go.work.sum
 
-# Vendor directory (if you're not vendoring dependencies)
-vendor/
+# ----------------------------------------------------------------------------
+# 3. Dependency management
+/vendor/
 
-# Go workspace files
-go.work
-go.work.sum
-
-# IDE/editor files
+# ----------------------------------------------------------------------------
+# 4. Editor/IDE files
 .vscode/
 .idea/
 *.swp
@@ -25,9 +28,11 @@ go.work.sum
 *.swn
 *~
 
-# System files
+# ----------------------------------------------------------------------------
+# 5. OS files
 .DS_Store
 Thumbs.db
 
-# Logs
+# ----------------------------------------------------------------------------
+# 6. Logs
 *.log
