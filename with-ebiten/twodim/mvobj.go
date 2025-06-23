@@ -1,5 +1,7 @@
 package twodim
 
+import "time"
+
 type Vec2 struct {
 	X float64
 	Y float64
@@ -39,15 +41,15 @@ func (o MvObj2) posY() float64 {
 	return o.Pos.Y
 }
 
-func (o MvObj2) moveX(t float64) {
-	o.setX(t*o.vX() + o.posX())
+func (o MvObj2) moveX(t time.Duration) {
+	o.setX(t.Seconds()*o.vX() + o.posX())
 }
 
-func (o MvObj2) moveY(t float64) {
-	o.setY(t*o.vY() + o.posY())
+func (o MvObj2) moveY(t time.Duration) {
+	o.setY(t.Seconds()*o.vY() + o.posY())
 }
 
-func (o MvObj2) Move(t float64) {
+func (o MvObj2) Move(t time.Duration) {
 	o.moveX(t)
 	o.moveY(t)
 }
