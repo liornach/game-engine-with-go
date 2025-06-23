@@ -1,15 +1,4 @@
-# ----------------------------------------------------------------------------
-# 1. Ignore Linux-style executables (no file extension)
-# ----------------------------------------------------------------------------
-# Ignore files in any directory that have no dots (roughly: no extension)
-*
-
-# Do not ignore directories or dotfiles
-!**/
-!.*
-
-# ----------------------------------------------------------------------------
-# 2. Go build artifacts
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
@@ -18,26 +7,27 @@
 *.test
 *.out
 
-# ----------------------------------------------------------------------------
-# 3. Dependency management
+# Output of `go run`
+*.run
+
+# Vendor directory (if you're not vendoring dependencies)
 vendor/
+
+# Go workspace files
 go.work
 go.work.sum
 
-# ----------------------------------------------------------------------------
-# 4. IDEs and editors
+# IDE/editor files
 .vscode/
 .idea/
-*~
 *.swp
 *.swo
-.swn
+*.swn
+*~
 
-# ----------------------------------------------------------------------------
-# 5. System files
+# System files
 .DS_Store
 Thumbs.db
 
-# ----------------------------------------------------------------------------
-# 6. Logs and debug
+# Logs
 *.log
