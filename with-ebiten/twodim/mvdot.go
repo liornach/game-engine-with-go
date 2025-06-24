@@ -6,7 +6,6 @@ import (
 )
 
 type Radians float64
-
 type Speed float64
 
 type MvDot struct {
@@ -15,8 +14,8 @@ type MvDot struct {
 	Direction Radians
 }
 
-func (m *MvDot) Move(dt time.Duration) Pos {
-	seconds := dt.Seconds()
+func (m *MvDot) ApplyTime(t time.Duration) Pos {
+	seconds := t.Seconds()
 
 	distance := float64(m.Speed) * seconds
 
@@ -29,6 +28,6 @@ func (m *MvDot) Move(dt time.Duration) Pos {
 	return m.Pos
 }
 
-func (m *MvDot) Rotate(r Radians) {
+func (m *MvDot) Rot(r Radians) {
 	m.Direction += r
 }

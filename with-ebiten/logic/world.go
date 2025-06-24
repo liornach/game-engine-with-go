@@ -1,10 +1,7 @@
 package logic
 
 import (
-	"math"
-
 	"github.com/google/uuid"
-	"github.com/liornach/game-engine-ebiten/twodim"
 )
 
 type Owner uuid.UUID
@@ -14,39 +11,47 @@ type Pos struct {
 }
 
 type RectWorld struct {
-	min    Pos
-	max    Pos
-	owners map[Pos]Owner
+	min     Pos
+	max     Pos
+	wrldMap map[Pos]Owner
 }
 
 type NotInWorldError struct{}
+type NotFreeError struct{}
 
 func (e NotInWorldError) Error() string {
 	return "not in world"
 }
 
+func (e NotFreeError) Error() string {
+	return "not free"
+}
+
 func (r *RectWorld) Set(o Owner, p Pos) (Owner, error) {
 	var err error
 	var owner Owner
+
 	if !r.IsInWorld(p) {
 		err = NotInWorldError{}
-	} else if r.IsFree(p) {
-		r.owners[p] = o
-		owner = o
-	} else if owner, _ = r.Owner(p); owner == o {
-		r.owners[p] = o
+	} else if owner, ok := r.Owner(p); ok {
+		if owner != o {
+			err = NotFreeError{}
+		}
 	} else {
-		// write that function better
+		r.wrldMap[p] = o
+		owner = o
 	}
+
+	return owner, err
 }
 
 func (r *RectWorld) Owner(p Pos) (Owner, bool) {
-	o, ok := r.owners[p]
+	o, ok := r.wrldMap[p]
 	return o, ok
 }
 
 func (r *RectWorld) IsFree(p Pos) bool {
-	_, ok := r.owners[p]
+	_, ok := r.wrldMap[p]
 	return !ok
 }
 
@@ -57,26 +62,6 @@ func (r *RectWorld) IsInWorld(p Pos) bool {
 		p.Y >= r.min.Y
 }
 
-// func (r *RectWorld) IsInWorld(p twodim.Pos) bool {
-// 	return p.X <= float64(r.max.X) &&
-// 		p.X >= float64(r.min.X) &&
-// 		p.Y <= float64(r.min.Y) &&
-// 		p.Y >= float64(r.min.Y)
-// }
-
-func ToWorldPos(p twodim.Pos) Pos {
-	x := roundAway(p.X)
-	y := roundAway(p.Y)
-	return Pos{
-		X: x,
-		Y: y,
-	}
-}
-
-func roundAway(f float64) int {
-	if f < 0 {
-		return int(math.Ceil(f))
-	} else {
-		return int(math.Floor(f))
-	}
+func (r *RectWorld) Map() ReadOnlyMap {
+	return NewReadOnlyMap(r.wrldMap)
 }
