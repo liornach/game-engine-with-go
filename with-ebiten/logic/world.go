@@ -1,6 +1,8 @@
 package logic
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 )
 
@@ -10,21 +12,22 @@ type Pos struct {
 	X, Y int
 }
 
+func (p Pos) String() string {
+	return fmt.Sprintf("x : %d, y : %d", p.X, p.Y)
+}
+
 type RectWorld struct {
 	min     Pos
 	max     Pos
 	wrldMap map[Pos]Owner
 }
 
-type NotInWorldError struct{}
-type NotFreeError struct{}
-
-func (e NotInWorldError) Error() string {
-	return "not in world"
-}
-
-func (e NotFreeError) Error() string {
-	return "not free"
+func NewRectWorld(min, max Pos) *RectWorld {
+	return &RectWorld{
+		min:     min,
+		max:     max,
+		wrldMap: map[Pos]Owner{},
+	}
 }
 
 func (r *RectWorld) Set(o Owner, p Pos) (Owner, error) {
@@ -35,7 +38,10 @@ func (r *RectWorld) Set(o Owner, p Pos) (Owner, error) {
 		err = NotInWorldError{}
 	} else if owner, ok := r.Owner(p); ok {
 		if owner != o {
-			err = NotFreeError{}
+			err = NotFreeError{
+				Pos:   p,
+				Owner: o,
+			}
 		}
 	} else {
 		r.wrldMap[p] = o

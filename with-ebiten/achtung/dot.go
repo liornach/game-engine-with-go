@@ -12,10 +12,10 @@ type Dot struct {
 	dot twodim.MvDot
 }
 
-func (d *Dot) ApplyTime(t time.Duration) logic.Pos {
+func (d *Dot) ApplyTime(t time.Duration) Pos {
 	p := d.dot.ApplyTime(t)
 	lp := toLogicPos(p)
-	return lp
+	return Pos(lp)
 }
 
 func (d *Dot) Rot(r Rad) {
