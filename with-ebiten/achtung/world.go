@@ -8,7 +8,7 @@ import (
 )
 
 type World struct {
-	World   *logic.RectWorld
+	World   *logic.World
 	Players map[Player]*Dot
 }
 
