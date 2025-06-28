@@ -21,7 +21,7 @@ type Rad twodim.Radians
 type Player uuid.UUID
 
 type Achtung struct {
-	world  World
+	world       *World
 	sensitivity Rad
 }
 

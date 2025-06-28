@@ -12,16 +12,20 @@ type World struct {
 	Players map[Player]*Dot
 }
 
-type PlayerPos struct {
-	player Player
-	pos    Pos
-}
-
-func NewWorld(playersPos []PlayerPos) *World {
-	return &World{
-		World:   logic.NewRectWorld(), // continue here
+func NewWorld(positions map[Player]Pos, min, max Pos) (*World, error) {
+	wrld := &World{
+		World:   logic.NewRectWorld(logic.Pos(min), logic.Pos(max)),
 		Players: map[Player]*Dot{},
 	}
+
+	for pl, pos := range positions {
+		_, err := wrld.set(pl, pos)
+		if err != nil {
+			return wrld, err
+		}
+	}
+
+	return wrld, nil
 }
 
 func (w *World) Rot(p Player, r Rad) error {
@@ -60,4 +64,8 @@ func (w *World) ApplyTime(t time.Duration) ([]error, []Collision) {
 	}
 
 	return errs, colls
+}
+
+func (w *World) Map() logic.ReadOnlyMap {
+	return w.World.Map()
 }

@@ -31,7 +31,7 @@ func isPressed(k ebiten.Key) bool {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-
+	g.onDraw(*screen)
 }
 
 // TODO : still need to understand that
@@ -39,7 +39,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 	return 320, 240
 }
 
-func (g *Game) OnKeyPress(k ebiten.Key, c Clbk) error {
+func (g *Game) SetOnKeyPress(k ebiten.Key, c Clbk) error {
 	var err error
 	if g.IsRegistered(k) {
 		err = AlreadyRegisteredError{}
@@ -65,7 +65,7 @@ func (e AlreadyRegisteredError) Error() string {
 	return "already registerd"
 }
 
-func (g *Game) OnDraw(c DrawClbk) error {
+func (g *Game) SetOnDraw(c DrawClbk) error {
 	var e error
 	if g.onDraw != nil {
 		e = AlreadyRegisteredError{}
