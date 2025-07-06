@@ -1,18 +1,20 @@
 package main
 
 import (
-	"log"
-
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/liornach/game-engine-ebiten/logic"
+	"github.com/hajimehoshi/ebiten"
+	"github.com/liornach/game-engine-ebiten/achtung"
 )
 
 func main() {
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowTitle("Hello, World!")
 
-	g := logic.NewGame()
-	if err := ebiten.RunGame(g); err != nil {
-		log.Fatal(err)
-	}
+	player1 := 
+
+	game := achtung.NewGame()
+
+
+	// if err := ebiten.RunGame(g); err != nil {
+	// 	log.Fatal(err)
+	// }
 }
