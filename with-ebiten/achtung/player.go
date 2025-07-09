@@ -18,11 +18,11 @@ const (
 )
 
 type Player struct {
-	color                     color.RGBA
-	uid                       string
+	col                       color.RGBA
 	turnLeftKey, turnRightKey ebiten.Key
 	head                      playerPos
-	velocity                  velocity
+	velocity                  Velocity
+	uniqueId                  uid
 }
 
 func NewPlayer(col Color, left, right ebiten.Key) *Player {
@@ -30,7 +30,7 @@ func NewPlayer(col Color, left, right ebiten.Key) *Player {
 
 	switch col {
 	case Blue:
-		rgba = color.RGBA{R: 0, G: 0, B: 225, A: 255}
+		rgba = color.RGBA{R: 0, G: 0, B: 255, A: 255}
 	case Red:
 		rgba = color.RGBA{R: 255, G: 0, B: 0, A: 255}
 	case Green:
@@ -40,12 +40,12 @@ func NewPlayer(col Color, left, right ebiten.Key) *Player {
 	}
 
 	return &Player{
-		color:        rgba,
-		uid:          string(col),
+		col:          rgba,
 		turnLeftKey:  left,
 		turnRightKey: right,
 		head:         playerPos{},
-		velocity:     velocity{},
+		velocity:     Velocity{},
+		uniqueId:     uid(col),
 	}
 }
 
@@ -68,20 +68,40 @@ func (p playerPos) toWorldPos() worldPos {
 	}
 }
 
-func (p playerPos) estimatePhysics(t time.Duration, v velocity) playerPos {
-	p.x += v.x * t.Seconds()
-	p.y += v.y * t.Seconds()
+func (p playerPos) estimatePhysics(t time.Duration, v Velocity) playerPos {
+	p.x += v.X * t.Seconds()
+	p.y += v.Y * t.Seconds()
 	return p
 }
 
-type velocity struct {
-	x, y float64
+type Velocity struct {
+	X, Y float64
 }
 
-func (v *velocity) rotate(rad float64) {
+func (v *Velocity) rotate(rad float64) {
 	cos := math.Cos(rad)
 	sin := math.Sin(rad)
-	oldx, oldy := v.x, v.y
-	v.x = oldx*cos - oldy*sin
-	v.y = oldx*sin - oldy*cos
+	oldx, oldy := v.X, v.Y
+	v.X = oldx*cos - oldy*sin
+	v.Y = oldx*sin + oldy*cos
+}
+
+func (p *Player) uid() uid {
+	return p.uniqueId
+}
+
+func (p *Player) color() color.RGBA {
+	return p.col
+}
+
+func (p *Player) isCollided(other objectInWorld, pos worldPos) bool {
+	// the suspected collider is this very player
+	if other.uid() == p.uid() {
+		// player head can not collide with itself
+		if p.head.toWorldPos() == pos {
+			return false
+		}
+	}
+
+	return true
 }

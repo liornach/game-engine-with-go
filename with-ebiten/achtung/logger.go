@@ -12,13 +12,14 @@ type gameLogger struct {
 }
 
 func newLogger(path string) (*gameLogger, error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	multi := io.MultiWriter(f, os.Stdout)
 	log.SetOutput(multi)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
 	return &gameLogger{
 		file: f,
@@ -34,5 +35,5 @@ func (l gameLogger) write(format string, v ...any) {
 		format += "\n"
 	}
 
-	log.Printf(format, v)
+	log.Printf(format, v...)
 }

@@ -9,48 +9,45 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type uid = string
+
+type objectInWorld interface {
+	isCollided(other objectInWorld, pos worldPos) bool
+	uid() uid
+	color() color.RGBA
+}
+
 type worldPos struct {
 	x, y int
 }
 
+// type objectInWorld struct {
+// 	isPlayer, isBorder bool
+// 	color              color.RGBA
+// }
+
+// func newObjectInWorld(isPlayer, isBorder bool, color color.RGBA) *objectInWorld {
+// 	return &objectInWorld{
+// 		isPlayer: isPlayer,
+// 		isBorder: isBorder,
+// 		color:    color,
+// 	}
+// }
+
 type game struct {
 	backgroundColor   color.RGBA
-	players           []*Player
-	world             map[worldPos]*Player
+	borderColor       color.RGBA
+	players           map[color.RGBA]*Player
+	world             map[worldPos]objectInWorld
 	rotateSensitivity float64
 	lastUpdate        time.Time
 	xratio, yratio    float64
 	logger            *gameLogger
+	warmupsCount      int
+	velocity          Velocity
 }
 
-func NewGame(players []*Player, rotation float64, xratio, yratio float64) (*game, error) {
-
-	pos := playerPos{
-		x: 10,
-		y: 20,
-	}
-
-	vel := velocity{
-		x: 3,
-		y: 3,
-	}
-
-	world := map[worldPos]*Player{}
-
-	for i, pi := range players {
-		for _, pj := range players[i+1:] {
-			if pj.uid == pi.uid {
-				return nil, fmt.Errorf("duplication of player with a uid %s", pi.uid)
-			}
-		}
-
-		players[i].velocity = vel
-		players[i].head = pos
-		world[players[i].head.toWorldPos()] = players[i]
-		pos.x += 10
-		pos.y += 20
-	}
-
+func NewGame(rotation float64, xratio, yratio float64, v Velocity, bg, border color.RGBA) (*game, error) {
 	if rotation <= 0 {
 		return nil, fmt.Errorf("rotation must be greater than zero")
 	}
@@ -67,27 +64,41 @@ func NewGame(players []*Player, rotation float64, xratio, yratio float64) (*game
 		return nil, err
 	}
 
-	background := color.RGBA{0, 0, 0, 1}
-
 	return &game{
-		backgroundColor:   background,
-		players:           players,
-		world:             world,
+		backgroundColor:   bg,
+		players:           make(map[color.RGBA]*Player),
+		world:             make(map[worldPos]objectInWorld),
 		rotateSensitivity: rotation,
-		lastUpdate:        time.Now(),
+		lastUpdate:        time.Time{},
 		xratio:            xratio,
 		yratio:            yratio,
 		logger:            logger,
+		warmupsCount:      0,
 	}, nil
 }
 
+func (g *game) RegisterPlayer(newP Player) error {
+	if len(g.players) == 2 {
+		return fmt.Errorf("currently only 2 max players are allowed")
+	}
+
+	if _, ok := g.players[newP.color]; ok {
+		return fmt.Errorf("player with color %s already exist", newP.color)
+	}
+
+	newP.velocity = g.velocity
+	g.players[newP.color] = &newP
+	return nil
+}
+
 func (g *game) Draw(screen *ebiten.Image) {
+	g.log("enteting draw loop")
 	screen.Fill(g.backgroundColor)
 
 	w := screen.Bounds().Dx()
 	h := screen.Bounds().Dy()
 
-	for pos, player := range g.world {
+	for pos, objInWorld := range g.world {
 		xpix := int(float64(pos.x) * g.xratio)
 		ypix := int(float64(pos.y) * g.yratio)
 
@@ -95,36 +106,60 @@ func (g *game) Draw(screen *ebiten.Image) {
 			panic(fmt.Sprintf("invalid draw position: (%d, %d)", xpix, ypix))
 		}
 
-		screen.Set(xpix, ypix, player.color)
+		screen.Set(xpix, ypix, objInWorld.color)
 	}
+
+	g.log("leaving draw loop")
 }
 
 func (g *game) Update() error {
+	g.log("entering update loop")
+
+	if g.warmupsCount < 1 {
+		g.warmupsCount++
+		return nil
+	}
+
 	now := time.Now()
+
+	if g.lastUpdate.IsZero() {
+		g.lastUpdate = now
+		g.log("last update time was being set to now")
+	}
+
 	elapsed := now.Sub(g.lastUpdate)
 	g.lastUpdate = now
 	colls := 0
 
-	for i := range g.players {
-		curP := g.players[i]
-		newHead := curP.estimatePhysics(elapsed)
+	for i, curPlayer := range g.players {
+		newHead := curPlayer.estimatePhysics(elapsed)
 		nextWorldPos := newHead.toWorldPos()
-		// now, need to debug
-		existing, ok := g.world[nextWorldPos]
 
-		if ok && (existing.uid != curP.uid || nextWorldPos != curP.head.toWorldPos()) {
-			colls++
-			g.logger.write("Collision at %v between %s and %s\n", nextWorldPos, existing.uid, curP.uid)
+		if existObjInWorld, ok := g.world[nextWorldPos]; ok {
+			if existObjInWorld.isCollided(curPlayer, nextWorldPos) {
+				colls++
+				g.logCollision(existObjInWorld, curPlayer, nextWorldPos)
+			}
 		} else {
-			curP.head = newHead
-			g.world[nextWorldPos] = curP
+			curPlayer.head = newHead // some logic shit here
+			g.world[nextWorldPos] = curPlayer
+			g.log("player %s was set in %v", curPlayer.uid, nextWorldPos)
 
-			if ebiten.IsKeyPressed(curP.turnLeftKey) {
-				curP.rotate(-g.rotateSensitivity)
+			isVelChanged := false
+			prevVel := curPlayer.velocity
+
+			if ebiten.IsKeyPressed(curPlayer.turnLeftKey) {
+				curPlayer.rotate(-g.rotateSensitivity)
+				isVelChanged = true
 			}
 
-			if ebiten.IsKeyPressed(curP.turnRightKey) {
-				curP.rotate(g.rotateSensitivity)
+			if ebiten.IsKeyPressed(curPlayer.turnRightKey) {
+				curPlayer.rotate(g.rotateSensitivity)
+				isVelChanged = true
+			}
+
+			if isVelChanged {
+				g.log("velocity of %s changed from %v to %v", curPlayer.uid, prevVel, curPlayer.velocity)
 			}
 		}
 	}
@@ -134,6 +169,7 @@ func (g *game) Update() error {
 		return errors.New("collision occured")
 	}
 
+	g.log("leaving update loop")
 	return nil
 }
 
@@ -143,4 +179,20 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 func (g *game) Close() {
 	g.logger.close()
+}
+
+func (g *game) log(msg string, args ...any) {
+	g.logger.write(msg, args...)
+}
+
+func (g *game) logCollision(exist objectInWorld, collider *Player, pos worldPos) {
+	g.log("Collision at %v between %s (existing) and %s (collider)", pos, exist.uid(), collider.uid())
+	g.log("Current player head : %v", collider.head.toWorldPos())
+	g.log("World Position : %v", pos)
+}
+
+func (g *game) movePlayerHead(p *Player, newHead playerPos, wpos worldPos) {
+	p.head = newHead
+	g.world[wpos] = p
+	g.log("%s player head was set in %v", p.uid, wpos)
 }

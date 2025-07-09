@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image/color"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -8,21 +9,33 @@ import (
 )
 
 func main() {
-	ebiten.SetWindowSize(640, 480)
+	ebiten.SetWindowSize(800, 800)
 	ebiten.SetWindowTitle("Hello, World!")
+	ebiten.SetRunnableOnUnfocused(true)
+	ebiten.SetTPS(ebiten.SyncWithFPS)
 
-	bluePlayer := achtung.NewPlayer(achtung.Blue, ebiten.KeyArrowLeft, ebiten.KeyArrowRight)
-	//redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD)
-	//players := []*achtung.Player{bluePlayer, redPlayer}
-	players := []*achtung.Player{bluePlayer}
-	rotation := 0.1
+	greenPl := achtung.NewPlayer(achtung.Green, ebiten.KeyArrowLeft, ebiten.KeyArrowRight)
+	redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD)
+	players := []*achtung.Player{greenPl, redPlayer}
+	rotation := 0.08
+	vel := achtung.Velocity{
+		X: 40,
+		Y: 40,
+	}
 
-	game, err := achtung.NewGame(players, rotation, 1, 1)
-	defer game.Close()
+	bg := color.RGBA{
+		R: 0,
+		G: 0,
+		B: 0,
+		A: 0,
+	}
+
+	game, err := achtung.NewGame(players, rotation, 1, 1, vel, bg)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
+	defer game.Close()
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
 	}
