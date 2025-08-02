@@ -1,27 +1,16 @@
 package achtung
 
-import (
-	"fmt"
-)
-
-type gameState int
-
-const (
-	gameIsRunning gameState = iota
-	collisionOccured
-)
-
-type state interface {
-	update(g *game) (bool, gameState)
-}
-
 type gameIsRunningState struct {
 }
 
-func (r *gameIsRunningState) update(g *game) (bool, gameState) {
-	g.log("entering update loop")
+func (r *gameIsRunningState) update(g *game) (bool, state) {
+	g.log("updating running state")
+
+	if len(g.collisions) > 0 {
+		panic("game has an unhandled collisions")
+	}
+
 	elapsed := g.touchTimer()
-	colls := 0
 
 	for _, curPlayer := range g.players {
 		newHead := curPlayer.estimatePhysics(elapsed)
@@ -29,13 +18,17 @@ func (r *gameIsRunningState) update(g *game) (bool, gameState) {
 
 		if existObjInWorld, ok := g.world[nextWorldPos]; ok {
 			if existObjInWorld.isCollided(curPlayer, nextWorldPos) {
-				colls++
-				g.logCollision(existObjInWorld, curPlayer, nextWorldPos)
+				col := collision{
+					objectsInvolved: []objectInWorld{curPlayer, existObjInWorld},
+					pos:             nextWorldPos,
+				}
+				g.collisions = append(g.collisions, col)
+				g.logCollision(col)
 				continue
 			}
 		} else { // this condition will meet only if player is not already own that position in world
 			g.world[nextWorldPos] = curPlayer
-			g.log("player %s was set in %v", curPlayer.uid, nextWorldPos)
+			g.log("player %s was set in %v", curPlayer.uid(), nextWorldPos)
 		}
 
 		curPlayer.head = newHead
@@ -46,11 +39,29 @@ func (r *gameIsRunningState) update(g *game) (bool, gameState) {
 		}
 	}
 
-	if colls != 0 {
-		fmt.Scanln()
-		return true, collisionOccured
+	if len(g.collisions) > 0 {
+		return true, &collisionOccuredState{}
 	}
 
-	g.log("leaving update loop")
-	return false, gameIsRunning
+	return false, r
+}
+
+type collisionOccuredState struct {
+}
+
+func (curState *collisionOccuredState) update(g *game) (bool, state) {
+	panic("collision occured")
+}
+
+type initialState struct {
+}
+
+func (curState *initialState) update(g *game) (bool, state) {
+	for _, p := range g.players {
+		randPos := g.randomPos.next()
+		p.head.x = float64(randPos.x)
+		p.head.y = float64(randPos.y)
+	}
+
+	return true, &gameIsRunningState{}
 }

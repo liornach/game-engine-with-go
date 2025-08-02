@@ -1,7 +1,6 @@
 package achtung
 
 import (
-	"errors"
 	"fmt"
 	"image/color"
 	"time"
@@ -21,6 +20,22 @@ type worldPos struct {
 	x, y int
 }
 
+func newWorldPos(x, y int) worldPos {
+	return worldPos{
+		x: x,
+		y: y,
+	}
+}
+
+type collision struct {
+	objectsInvolved []objectInWorld
+	pos             worldPos
+}
+
+type state interface {
+	update(g *game) (bool, state)
+}
+
 type game struct {
 	backgroundColor   color.RGBA
 	borderColor       color.RGBA
@@ -32,6 +47,9 @@ type game struct {
 	logger            *gameLogger
 	warmupsCount      int
 	velocity          Velocity
+	collisions        []collision
+	state             state
+	randomPos         randomPos
 }
 
 func NewGame(rotation float64, xratio, yratio float64, v Velocity, bg, border color.RGBA) (*game, error) {
@@ -62,6 +80,11 @@ func NewGame(rotation float64, xratio, yratio float64, v Velocity, bg, border co
 		yratio:            yratio,
 		logger:            logger,
 		warmupsCount:      0,
+		borderColor:       border,
+		velocity:          v,
+		collisions:        []collision{},
+		state:             &initialState{},
+		randomPos:         newRandomPos([]worldPos{newWorldPos(10, 10), newWorldPos(100, 150)}),
 	}, nil
 }
 
@@ -108,35 +131,8 @@ func (g *game) Update() error {
 		return nil
 	}
 
-	elapsed := g.touchTimer()
-	colls := 0
-
-	for _, curPlayer := range g.players {
-		newHead := curPlayer.estimatePhysics(elapsed)
-		nextWorldPos := newHead.toWorldPos()
-
-		if existObjInWorld, ok := g.world[nextWorldPos]; ok {
-			if existObjInWorld.isCollided(curPlayer, nextWorldPos) {
-				colls++
-				g.logCollision(existObjInWorld, curPlayer, nextWorldPos)
-				continue
-			}
-		} else { // this condition will meet only if player is not already own that position in world
-			g.world[nextWorldPos] = curPlayer
-			g.log("player %s was set in %v", curPlayer.uid, nextWorldPos)
-		}
-
-		curPlayer.head = newHead
-
-		prevVel := curPlayer.velocity
-		if curPlayer.rotateIfKeysPressed(g.rotateSensitivity) {
-			g.log("velocity of %s changed from %v to %v", curPlayer.uid, prevVel, curPlayer.velocity)
-		}
-	}
-
-	if colls != 0 {
-		fmt.Scanln()
-		return errors.New("collision occured")
+	if stateChanged, newState := g.state.update(g); stateChanged {
+		g.state = newState
 	}
 
 	g.log("leaving update loop")
@@ -155,10 +151,18 @@ func (g *game) log(msg string, args ...any) {
 	g.logger.write(msg, args...)
 }
 
-func (g *game) logCollision(exist objectInWorld, collider *Player, pos worldPos) {
-	g.log("Collision at %v between %s (existing) and %s (collider)", pos, exist.uid(), collider.uid())
-	g.log("Current player head : %v", collider.head.toWorldPos())
-	g.log("World Position : %v", pos)
+func (g *game) logCollision(c collision) {
+	objectsCount := len(c.objectsInvolved)
+	first := c.objectsInvolved[0]
+
+	if objectsCount == 1 {
+		g.log("Collision at %v between %s and itself", c.pos, first)
+	} else if objectsCount == 2 {
+		second := c.objectsInvolved[1]
+		g.log("Collision at %v between %s and %s", c.pos, first.uid(), second.uid())
+	} else {
+		panic("unknown collision case had occured")
+	}
 }
 
 func (g *game) touchTimer() time.Duration {
@@ -171,4 +175,8 @@ func (g *game) touchTimer() time.Duration {
 	elapsed := now.Sub(g.lastUpdate)
 	g.lastUpdate = now
 	return elapsed
+}
+
+func (g *game) resetTimer() {
+	g.lastUpdate = time.Time{}
 }
