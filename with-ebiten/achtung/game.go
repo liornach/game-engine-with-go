@@ -21,19 +21,6 @@ type worldPos struct {
 	x, y int
 }
 
-// type objectInWorld struct {
-// 	isPlayer, isBorder bool
-// 	color              color.RGBA
-// }
-
-// func newObjectInWorld(isPlayer, isBorder bool, color color.RGBA) *objectInWorld {
-// 	return &objectInWorld{
-// 		isPlayer: isPlayer,
-// 		isBorder: isBorder,
-// 		color:    color,
-// 	}
-// }
-
 type game struct {
 	backgroundColor   color.RGBA
 	borderColor       color.RGBA
@@ -58,6 +45,7 @@ func NewGame(rotation float64, xratio, yratio float64, v Velocity, bg, border co
 		return nil, fmt.Errorf("yratio must be greater than zero")
 	}
 	// todo - set players head, check that they are not overlapping
+	// todo - set borders, add logic to borders (you have an interface for that)
 
 	logger, err := newLogger("logs")
 	if err != nil {
@@ -82,12 +70,12 @@ func (g *game) RegisterPlayer(newP Player) error {
 		return fmt.Errorf("currently only 2 max players are allowed")
 	}
 
-	if _, ok := g.players[newP.color]; ok {
-		return fmt.Errorf("player with color %s already exist", newP.color)
+	if _, ok := g.players[newP.color()]; ok {
+		return fmt.Errorf("player with uid %s already exist", newP.uid())
 	}
 
 	newP.velocity = g.velocity
-	g.players[newP.color] = &newP
+	g.players[newP.color()] = &newP
 	return nil
 }
 
@@ -106,7 +94,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 			panic(fmt.Sprintf("invalid draw position: (%d, %d)", xpix, ypix))
 		}
 
-		screen.Set(xpix, ypix, objInWorld.color)
+		screen.Set(xpix, ypix, objInWorld.color())
 	}
 
 	g.log("leaving draw loop")
@@ -120,18 +108,10 @@ func (g *game) Update() error {
 		return nil
 	}
 
-	now := time.Now()
-
-	if g.lastUpdate.IsZero() {
-		g.lastUpdate = now
-		g.log("last update time was being set to now")
-	}
-
-	elapsed := now.Sub(g.lastUpdate)
-	g.lastUpdate = now
+	elapsed := g.touchTimer()
 	colls := 0
 
-	for i, curPlayer := range g.players {
+	for _, curPlayer := range g.players {
 		newHead := curPlayer.estimatePhysics(elapsed)
 		nextWorldPos := newHead.toWorldPos()
 
@@ -139,28 +119,18 @@ func (g *game) Update() error {
 			if existObjInWorld.isCollided(curPlayer, nextWorldPos) {
 				colls++
 				g.logCollision(existObjInWorld, curPlayer, nextWorldPos)
+				continue
 			}
-		} else {
-			curPlayer.head = newHead // some logic shit here
+		} else { // this condition will meet only if player is not already own that position in world
 			g.world[nextWorldPos] = curPlayer
 			g.log("player %s was set in %v", curPlayer.uid, nextWorldPos)
+		}
 
-			isVelChanged := false
-			prevVel := curPlayer.velocity
+		curPlayer.head = newHead
 
-			if ebiten.IsKeyPressed(curPlayer.turnLeftKey) {
-				curPlayer.rotate(-g.rotateSensitivity)
-				isVelChanged = true
-			}
-
-			if ebiten.IsKeyPressed(curPlayer.turnRightKey) {
-				curPlayer.rotate(g.rotateSensitivity)
-				isVelChanged = true
-			}
-
-			if isVelChanged {
-				g.log("velocity of %s changed from %v to %v", curPlayer.uid, prevVel, curPlayer.velocity)
-			}
+		prevVel := curPlayer.velocity
+		if curPlayer.rotateIfKeysPressed(g.rotateSensitivity) {
+			g.log("velocity of %s changed from %v to %v", curPlayer.uid, prevVel, curPlayer.velocity)
 		}
 	}
 
@@ -191,8 +161,14 @@ func (g *game) logCollision(exist objectInWorld, collider *Player, pos worldPos)
 	g.log("World Position : %v", pos)
 }
 
-func (g *game) movePlayerHead(p *Player, newHead playerPos, wpos worldPos) {
-	p.head = newHead
-	g.world[wpos] = p
-	g.log("%s player head was set in %v", p.uid, wpos)
+func (g *game) touchTimer() time.Duration {
+	now := time.Now()
+
+	if g.lastUpdate.IsZero() {
+		g.lastUpdate = now
+	}
+
+	elapsed := now.Sub(g.lastUpdate)
+	g.lastUpdate = now
+	return elapsed
 }

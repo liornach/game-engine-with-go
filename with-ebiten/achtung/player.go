@@ -105,3 +105,21 @@ func (p *Player) isCollided(other objectInWorld, pos worldPos) bool {
 
 	return true
 }
+
+func (p *Player) rotateIfKeysPressed(rad float64) bool {
+	if rad < 0 {
+		panic("radians in this context must be greater then or equal to zero")
+	}
+
+	if ebiten.IsKeyPressed(p.turnRightKey) {
+		p.rotate(rad)
+		return true
+	}
+
+	if ebiten.IsKeyPressed(p.turnLeftKey) {
+		p.rotate(-rad)
+		return true
+	}
+
+	return false
+}

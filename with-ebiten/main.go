@@ -30,10 +30,26 @@ func main() {
 		A: 0,
 	}
 
-	game, err := achtung.NewGame(players, rotation, 1, 1, vel, bg)
+	border := color.RGBA{
+		R: 255,
+		G: 255,
+		B: 255,
+		A: 255,
+	}
+
+	game, err := achtung.NewGame(rotation, 1, 1, vel, bg, border)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	for _, p := range players {
+		if err := game.RegisterPlayer(*p); err != nil {
+			panic(err)
+		}
+	}
+
+	game.RegisterPlayer(*greenPl)
+	game.RegisterPlayer(*redPlayer)
 
 	defer game.Close()
 	if err := ebiten.RunGame(game); err != nil {
