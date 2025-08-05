@@ -23,9 +23,31 @@ type Player struct {
 	head                      playerPos
 	velocity                  Velocity
 	uniqueId                  uid
+	rotation                  float64
 }
 
-func NewPlayer(col Color, left, right ebiten.Key) *Player {
+func (p *Player) setHead(pos WorldPos) {
+	p.head.X = float64(pos.X)
+	p.head.Y = float64(pos.Y)
+}
+
+func (p *Player) Head() WorldPos {
+	return p.head.toWorldPos()
+}
+
+func (p *Player) TurnRightKey() Key {
+	return p.turnRightKey
+}
+
+func (p *Player) TurnLeftKey() Key {
+	return p.turnLeftKey
+}
+
+func (p *Player) Velocity() Velocity {
+	return p.velocity
+}
+
+func NewPlayer(col Color, left, right ebiten.Key, rot float64) *Player {
 	var rgba color.RGBA
 
 	switch col {
@@ -46,31 +68,44 @@ func NewPlayer(col Color, left, right ebiten.Key) *Player {
 		head:         playerPos{},
 		velocity:     Velocity{},
 		uniqueId:     uid(col),
+		rotation:     rot,
 	}
 }
 
-func (p *Player) estimatePhysics(t time.Duration) playerPos {
+func (p *Player) EstimatePhysics(t time.Duration) playerPos {
 	return p.head.estimatePhysics(t, p.velocity)
 }
 
-func (p *Player) rotate(rad float64) {
-	p.velocity.rotate(rad)
+func (p *Player) ApplyPhysics(t time.Duration) {
+	p.head = p.EstimatePhysics(t)
+}
+
+func (p *Player) rotateRight() {
+	p.velocity.rotate(p.rotation)
+}
+
+func (p *Player) rotateLeft() {
+	p.velocity.rotate(-p.rotation)
+}
+
+func (p *Player) Rotation() float64 {
+	return p.rotation
 }
 
 type playerPos struct {
-	x, y float64
+	X, Y float64
 }
 
-func (p playerPos) toWorldPos() worldPos {
-	return worldPos{
-		x: int(p.x),
-		y: int(p.y),
+func (p playerPos) toWorldPos() WorldPos {
+	return WorldPos{
+		X: int(p.X),
+		Y: int(p.Y),
 	}
 }
 
 func (p playerPos) estimatePhysics(t time.Duration, v Velocity) playerPos {
-	p.x += v.X * t.Seconds()
-	p.y += v.Y * t.Seconds()
+	p.X += v.X * t.Seconds()
+	p.Y += v.Y * t.Seconds()
 	return p
 }
 
@@ -86,7 +121,7 @@ func (v *Velocity) rotate(rad float64) {
 	v.Y = oldx*sin + oldy*cos
 }
 
-func (p *Player) uid() uid {
+func (p *Player) Uid() uid {
 	return p.uniqueId
 }
 
@@ -94,9 +129,9 @@ func (p *Player) color() color.RGBA {
 	return p.col
 }
 
-func (p *Player) isCollided(other objectInWorld, pos worldPos) bool {
+func (p *Player) IsCollided(other ObjectInWorld, pos WorldPos) bool {
 	// the suspected collider is this very player
-	if other.uid() == p.uid() {
+	if other.Uid() == p.Uid() {
 		// player head can not collide with itself
 		if p.head.toWorldPos() == pos {
 			return false
@@ -104,22 +139,4 @@ func (p *Player) isCollided(other objectInWorld, pos worldPos) bool {
 	}
 
 	return true
-}
-
-func (p *Player) rotateIfKeysPressed(rad float64) bool {
-	if rad < 0 {
-		panic("radians in this context must be greater then or equal to zero")
-	}
-
-	if ebiten.IsKeyPressed(p.turnRightKey) {
-		p.rotate(rad)
-		return true
-	}
-
-	if ebiten.IsKeyPressed(p.turnLeftKey) {
-		p.rotate(-rad)
-		return true
-	}
-
-	return false
 }

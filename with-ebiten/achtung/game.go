@@ -8,101 +8,129 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type State interface {
+	Update(g *Game) (bool, State)
+}
+
 type uid = string
 
-type objectInWorld interface {
-	isCollided(other objectInWorld, pos worldPos) bool
-	uid() uid
+type ObjectInWorld interface {
+	IsCollided(other ObjectInWorld, pos WorldPos) bool
+	Uid() uid
 	color() color.RGBA
 }
 
-type worldPos struct {
-	x, y int
+type WorldPos struct {
+	X, Y int
 }
 
-func newWorldPos(x, y int) worldPos {
-	return worldPos{
-		x: x,
-		y: y,
+type Collision struct {
+	Objects []ObjectInWorld
+	Pos     WorldPos
+}
+
+type Game struct {
+	backgroundColor color.RGBA
+	borderColor     color.RGBA
+	Players         map[color.RGBA]*Player
+	world           map[WorldPos]ObjectInWorld
+	lastUpdate      time.Time
+	xratio, yratio  float64
+	logger          *gameLogger
+	warmupsCount    int
+	velocity        Velocity
+	collisions      []Collision
+	state           State
+	inputHandler    inputHandler
+}
+
+func (g *Game) PosOwner(wp WorldPos) (ObjectInWorld, bool) {
+	o, ok := g.world[wp]
+	return o, ok
+}
+
+func (g *Game) EstimatedNextWorldPos(p *Player, elapsed time.Duration) WorldPos {
+	return p.EstimatePhysics(elapsed).toWorldPos()
+}
+
+func (g *Game) PlayerHead(p *Player) WorldPos {
+	return p.Head()
+}
+
+func (g *Game) SetPlayerHead(p *Player, wp WorldPos) {
+	p.setHead(wp)
+}
+
+func (g *Game) ApplyPhysicsToPlayer(p *Player, t time.Duration) {
+	p.ApplyPhysics(t)
+}
+
+func (g *Game) IsPlayerHeadAt(p *Player, wp WorldPos) bool {
+	return g.PlayerHead(p) == wp
+}
+
+func (g *Game) IsPosOwnedBy(wp WorldPos, o ObjectInWorld) bool {
+	exist, ok := g.PosOwner(wp)
+	if !ok {
+		return false
 	}
+
+	return exist.Uid() == o.Uid()
 }
 
-type collision struct {
-	objectsInvolved []objectInWorld
-	pos             worldPos
+func (g *Game) IsPosFree(wp WorldPos) bool {
+	_, ok := g.PosOwner(wp)
+	return !ok
 }
 
-type state interface {
-	update(g *game) (bool, state)
+func (g *Game) SetPosOwner(wp WorldPos, o ObjectInWorld) {
+	g.world[wp] = o
 }
 
-type game struct {
-	backgroundColor   color.RGBA
-	borderColor       color.RGBA
-	players           map[color.RGBA]*Player
-	world             map[worldPos]objectInWorld
-	rotateSensitivity float64
-	lastUpdate        time.Time
-	xratio, yratio    float64
-	logger            *gameLogger
-	warmupsCount      int
-	velocity          Velocity
-	collisions        []collision
-	state             state
-	randomPos         randomPos
-}
-
-func NewGame(rotation float64, xratio, yratio float64, v Velocity, bg, border color.RGBA) (*game, error) {
-	if rotation <= 0 {
-		return nil, fmt.Errorf("rotation must be greater than zero")
-	}
+func NewGame(xratio, yratio float64, v Velocity, bg, border color.RGBA, initialState State) (*Game, error) {
 	if xratio <= 0 {
 		return nil, fmt.Errorf("xratio must be greater than zero")
 	}
 	if yratio <= 0 {
 		return nil, fmt.Errorf("yratio must be greater than zero")
 	}
-	// todo - set players head, check that they are not overlapping
-	// todo - set borders, add logic to borders (you have an interface for that)
 
 	logger, err := newLogger("logs")
 	if err != nil {
 		return nil, err
 	}
 
-	return &game{
-		backgroundColor:   bg,
-		players:           make(map[color.RGBA]*Player),
-		world:             make(map[worldPos]objectInWorld),
-		rotateSensitivity: rotation,
-		lastUpdate:        time.Time{},
-		xratio:            xratio,
-		yratio:            yratio,
-		logger:            logger,
-		warmupsCount:      0,
-		borderColor:       border,
-		velocity:          v,
-		collisions:        []collision{},
-		state:             &initialState{},
-		randomPos:         newRandomPos([]worldPos{newWorldPos(10, 10), newWorldPos(100, 150)}),
+	return &Game{
+		backgroundColor: bg,
+		Players:         make(map[color.RGBA]*Player),
+		world:           make(map[WorldPos]ObjectInWorld),
+		lastUpdate:      time.Time{},
+		xratio:          xratio,
+		yratio:          yratio,
+		logger:          logger,
+		warmupsCount:    0,
+		borderColor:     border,
+		velocity:        v,
+		collisions:      []Collision{},
+		state:           initialState,
 	}, nil
 }
 
-func (g *game) RegisterPlayer(newP Player) error {
-	if len(g.players) == 2 {
+func (g *Game) RegisterPlayer(newP Player) error {
+	if len(g.Players) == 2 {
 		return fmt.Errorf("currently only 2 max players are allowed")
 	}
 
-	if _, ok := g.players[newP.color()]; ok {
-		return fmt.Errorf("player with uid %s already exist", newP.uid())
+	if _, ok := g.Players[newP.color()]; ok {
+		return fmt.Errorf("player with uid %s already exist", newP.Uid())
 	}
 
 	newP.velocity = g.velocity
-	g.players[newP.color()] = &newP
+	g.Players[newP.color()] = &newP
 	return nil
 }
 
-func (g *game) Draw(screen *ebiten.Image) {
+func (g *Game) Draw(screen *ebiten.Image) {
 	g.log("enteting draw loop")
 	screen.Fill(g.backgroundColor)
 
@@ -110,8 +138,8 @@ func (g *game) Draw(screen *ebiten.Image) {
 	h := screen.Bounds().Dy()
 
 	for pos, objInWorld := range g.world {
-		xpix := int(float64(pos.x) * g.xratio)
-		ypix := int(float64(pos.y) * g.yratio)
+		xpix := int(float64(pos.X) * g.xratio)
+		ypix := int(float64(pos.Y) * g.yratio)
 
 		if xpix < 0 || xpix >= w || ypix < 0 || ypix >= h {
 			panic(fmt.Sprintf("invalid draw position: (%d, %d)", xpix, ypix))
@@ -123,7 +151,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 	g.log("leaving draw loop")
 }
 
-func (g *game) Update() error {
+func (g *Game) Update() error {
 	g.log("entering update loop")
 
 	if g.warmupsCount < 1 {
@@ -131,7 +159,7 @@ func (g *game) Update() error {
 		return nil
 	}
 
-	if stateChanged, newState := g.state.update(g); stateChanged {
+	if stateChanged, newState := g.state.Update(g); stateChanged {
 		g.state = newState
 	}
 
@@ -139,33 +167,33 @@ func (g *game) Update() error {
 	return nil
 }
 
-func (g *game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return outsideWidth, outsideHeight
 }
 
-func (g *game) Close() {
+func (g *Game) Close() {
 	g.logger.close()
 }
 
-func (g *game) log(msg string, args ...any) {
+func (g *Game) log(msg string, args ...any) {
 	g.logger.write(msg, args...)
 }
 
-func (g *game) logCollision(c collision) {
-	objectsCount := len(c.objectsInvolved)
-	first := c.objectsInvolved[0]
+func (g *Game) logCollision(c Collision) {
+	objectsCount := len(c.Objects)
+	first := c.Objects[0]
 
 	if objectsCount == 1 {
-		g.log("Collision at %v between %s and itself", c.pos, first)
+		g.log("Collision at %v between %s and itself", c.Pos, first)
 	} else if objectsCount == 2 {
-		second := c.objectsInvolved[1]
-		g.log("Collision at %v between %s and %s", c.pos, first.uid(), second.uid())
+		second := c.Objects[1]
+		g.log("Collision at %v between %s and %s", c.Pos, first.Uid(), second.Uid())
 	} else {
 		panic("unknown collision case had occured")
 	}
 }
 
-func (g *game) touchTimer() time.Duration {
+func (g *Game) TouchTimer() time.Duration {
 	now := time.Now()
 
 	if g.lastUpdate.IsZero() {
@@ -177,6 +205,40 @@ func (g *game) touchTimer() time.Duration {
 	return elapsed
 }
 
-func (g *game) resetTimer() {
+func (g *Game) ResetTimer() {
 	g.lastUpdate = time.Time{}
+}
+
+func (g *Game) AddCollision(c Collision) {
+	g.collisions = append(g.collisions, c)
+	g.logCollision(c)
+}
+
+func (g *Game) CollisionsCount() int {
+	return len(g.collisions)
+}
+
+func (g *Game) Collisions() []Collision {
+	return g.collisions
+}
+
+func (g *Game) ClearCollisions() {
+	g.collisions = []Collision{}
+}
+
+func (g *Game) InputHandler() inputHandler {
+	return g.inputHandler
+}
+
+func (g *Game) HandlePlayerKeys(p *Player) {
+	ih := g.InputHandler()
+	if ih.IsKeyPressed(p.TurnRightKey()) {
+		p.rotateRight()
+		g.log("player rotate right")
+	}
+
+	if ih.IsKeyPressed(p.TurnLeftKey()) {
+		p.rotateLeft()
+		g.log("player rotate left")
+	}
 }

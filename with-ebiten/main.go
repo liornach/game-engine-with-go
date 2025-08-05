@@ -6,7 +6,10 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/liornach/game-engine-ebiten/achtung"
+	"github.com/liornach/game-engine-ebiten/achtung/states"
 )
+
+type worldPos = achtung.WorldPos
 
 func main() {
 	ebiten.SetWindowSize(800, 800)
@@ -14,10 +17,11 @@ func main() {
 	ebiten.SetRunnableOnUnfocused(true)
 	ebiten.SetTPS(ebiten.SyncWithFPS)
 
-	greenPl := achtung.NewPlayer(achtung.Green, ebiten.KeyArrowLeft, ebiten.KeyArrowRight)
-	redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD)
-	players := []*achtung.Player{greenPl, redPlayer}
 	rotation := 0.08
+	greenPl := achtung.NewPlayer(achtung.Green, ebiten.KeyArrowLeft, ebiten.KeyArrowRight, rotation)
+	redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD, rotation)
+
+	players := []*achtung.Player{greenPl, redPlayer}
 	vel := achtung.Velocity{
 		X: 40,
 		Y: 40,
@@ -37,7 +41,17 @@ func main() {
 		A: 255,
 	}
 
-	game, err := achtung.NewGame(rotation, 1, 1, vel, bg, border)
+	posOptions := []worldPos{worldPos{
+		X: 65,
+		Y: 30,
+	}, worldPos{
+		X: 32,
+		Y: 78,
+	}}
+
+	randomPos := states.NewRandomPos(posOptions)
+	initialState := states.NewInitialState(randomPos)
+	game, err := achtung.NewGame(1, 1, vel, bg, border, initialState)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
