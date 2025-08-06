@@ -6,62 +6,120 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/liornach/game-engine-ebiten/achtung/world"
 )
 
 type State interface {
 	Update(g *Game) (bool, State)
 }
 
-type uid = string
-
-type ObjectInWorld interface {
-	IsCollided(other ObjectInWorld, pos WorldPos) bool
-	Uid() uid
-	color() color.RGBA
+type PlayerPos struct {
+	X, Y float64
 }
 
-type WorldPos struct {
-	X, Y int
+func (p PlayerPos) toWorldPos() WorldPos {
+	return WorldPos{
+		X: int(p.X),
+		Y: int(p.Y),
+	}
 }
 
-type Collision struct {
-	Objects []ObjectInWorld
-	Pos     WorldPos
+type Player interface {
+	Head() PlayerPos
+	SetHead(PlayerPos)
+	EstimateHeadFutureLocation(time.Duration) PlayerPos
+	ApplyPhysics(time.Duration) PlayerPos
+	Uid() Uid
+	Color() color.RGBA
+}
+
+type Uid = string
+
+// type ObjectInWorld interface {
+// 	//IsCollided(other ObjectInWorld, pos WorldPos) bool
+// 	Uid() Uid
+// 	Color() color.RGBA
+// }
+
+func (wp WorldPos) toPlayerPos() PlayerPos {
+	return PlayerPos{
+		X: float64(wp.X),
+		Y: float64(wp.Y),
+	}
+}
+
+// func (c *Collision) AddObject(o ObjectInWorld) {
+// 	if ()
+// 	c.Objects[o.Uid()] = o
+// }
+
+type Score struct {
+	Player *Player
+	Score  int
 }
 
 type Game struct {
 	backgroundColor color.RGBA
 	borderColor     color.RGBA
-	Players         map[color.RGBA]*Player
-	world           map[WorldPos]ObjectInWorld
+	Players         []Player
+	world           world.World
 	lastUpdate      time.Time
 	xratio, yratio  float64
 	logger          *gameLogger
 	warmupsCount    int
-	velocity        Velocity
-	collisions      []Collision
-	state           State
-	inputHandler    inputHandler
+	//velocity          Velocity
+	//collisions        []Collision
+	state             State
+	inputHandler      inputHandler
+	scores            []Score
+	eliminatedPlayers []Uid
 }
 
-func (g *Game) PosOwner(wp WorldPos) (ObjectInWorld, bool) {
-	o, ok := g.world[wp]
-	return o, ok
+func (g *Game) World() world.World {
+	return g.world
 }
 
-func (g *Game) EstimatedNextWorldPos(p *Player, elapsed time.Duration) WorldPos {
-	return p.EstimatePhysics(elapsed).toWorldPos()
+// func (g *Game) PosOwner(wp WorldPos) (ObjectInWorld, bool) {
+// 	o, ok := g.world[wp]
+// 	return o, ok
+// }
+
+func (g *Game) EstimatedNextWorldPos(p Player, elapsed time.Duration) WorldPos {
+	return p.EstimateHeadFutureLocation(elapsed).toWorldPos()
 }
 
-func (g *Game) PlayerHead(p *Player) WorldPos {
-	return p.Head()
+func (g *Game) PlayerHead(p Player) WorldPos {
+	return p.Head().toWorldPos()
 }
 
-func (g *Game) SetPlayerHead(p *Player, wp WorldPos) {
-	p.setHead(wp)
+func (g *Game) SetPlayerHead(p Player, wp WorldPos) {
+	playerPos := wp.toPlayerPos()
+	p.SetHead(playerPos)
 }
 
-func (g *Game) ApplyPhysicsToPlayer(p *Player, t time.Duration) {
+func (g *Game) EstimateCollisions(t time.Duration) []Collision {
+	collisions := make(map[WorldPos]*Collision)
+
+	for _, p := range g.Players {
+		if g.IsEliminated(p.Uid()) {
+			continue
+		}
+
+		futureHead := p.EstimateHeadFutureLocation(t).toWorldPos()
+		if futureHead == p.Head().toWorldPos() {
+			continue
+		}
+
+		if g.IsPosFree(futureHead) {
+			if col, ok := collisions[futureHead]; ok {
+				col.Objects = append(col.Objects, p)
+			}
+		}
+
+	}
+}
+
+func (g *Game) ApplyPhysicsToPlayer(p Player, t time.Duration) {
 	p.ApplyPhysics(t)
 }
 
@@ -87,7 +145,7 @@ func (g *Game) SetPosOwner(wp WorldPos, o ObjectInWorld) {
 	g.world[wp] = o
 }
 
-func NewGame(xratio, yratio float64, v Velocity, bg, border color.RGBA, initialState State) (*Game, error) {
+func NewGame(xratio, yratio float64, bg, border color.RGBA, initialState State) (*Game, error) {
 	if xratio <= 0 {
 		return nil, fmt.Errorf("xratio must be greater than zero")
 	}
@@ -101,19 +159,45 @@ func NewGame(xratio, yratio float64, v Velocity, bg, border color.RGBA, initialS
 	}
 
 	return &Game{
-		backgroundColor: bg,
-		Players:         make(map[color.RGBA]*Player),
-		world:           make(map[WorldPos]ObjectInWorld),
-		lastUpdate:      time.Time{},
-		xratio:          xratio,
-		yratio:          yratio,
-		logger:          logger,
-		warmupsCount:    0,
-		borderColor:     border,
-		velocity:        v,
-		collisions:      []Collision{},
-		state:           initialState,
+		backgroundColor:   bg,
+		Players:           []Player{},
+		world:             make(map[WorldPos]ObjectInWorld),
+		lastUpdate:        time.Time{},
+		xratio:            xratio,
+		yratio:            yratio,
+		logger:            logger,
+		warmupsCount:      0,
+		borderColor:       border,
+		collisions:        []Collision{},
+		state:             initialState,
+		inputHandler:      inputHandler{},
+		scores:            []Score{},
+		eliminatedPlayers: []Uid{},
 	}, nil
+}
+
+func (g *Game) IsRegistered(puid Uid) bool {
+	for _, registered := range g.Players {
+		if registered.Uid() == puid {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (g *Game) IsEliminated(p Uid) bool {
+	if !g.IsRegistered(p) {
+		panic("player is not registered")
+	}
+
+	for _, eliminated := range g.eliminatedPlayers {
+		if eliminated == p {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (g *Game) RegisterPlayer(newP Player) error {
@@ -121,12 +205,17 @@ func (g *Game) RegisterPlayer(newP Player) error {
 		return fmt.Errorf("currently only 2 max players are allowed")
 	}
 
-	if _, ok := g.Players[newP.color()]; ok {
-		return fmt.Errorf("player with uid %s already exist", newP.Uid())
+	if g.IsRegistered(newP.Uid()) {
+		err := fmt.Errorf("player with uid %s already exist", newP.Uid())
+		panic(err)
 	}
 
-	newP.velocity = g.velocity
-	g.Players[newP.color()] = &newP
+	for _, existP := range g.Players {
+		if existP.color() == newP.color() {
+			return fmt.Errorf("player with color %v already exist", existP.color())
+		}
+	}
+
 	return nil
 }
 

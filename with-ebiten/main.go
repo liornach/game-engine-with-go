@@ -18,14 +18,14 @@ func main() {
 	ebiten.SetTPS(ebiten.SyncWithFPS)
 
 	rotation := 0.08
-	greenPl := achtung.NewPlayer(achtung.Green, ebiten.KeyArrowLeft, ebiten.KeyArrowRight, rotation)
-	redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD, rotation)
-
-	players := []*achtung.Player{greenPl, redPlayer}
 	vel := achtung.Velocity{
 		X: 40,
 		Y: 40,
 	}
+	greenPl := achtung.NewPlayer(achtung.Green, ebiten.KeyArrowLeft, ebiten.KeyArrowRight, rotation, vel)
+	redPlayer := achtung.NewPlayer(achtung.Red, ebiten.KeyA, ebiten.KeyD, rotation, vel)
+
+	players := []*achtung.Player{greenPl, redPlayer}
 
 	bg := color.RGBA{
 		R: 0,
@@ -51,7 +51,7 @@ func main() {
 
 	randomPos := states.NewRandomPos(posOptions)
 	initialState := states.NewInitialState(randomPos)
-	game, err := achtung.NewGame(1, 1, vel, bg, border, initialState)
+	game, err := achtung.NewGame(1, 1, bg, border, initialState)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
