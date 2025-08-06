@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/liornach/game-engine-ebiten/achtung/players"
 	"github.com/liornach/game-engine-ebiten/achtung/world"
 )
 
@@ -17,23 +18,24 @@ type PlayerPos struct {
 	X, Y float64
 }
 
-func (p PlayerPos) toWorldPos() WorldPos {
-	return WorldPos{
-		X: int(p.X),
-		Y: int(p.Y),
-	}
-}
+// func (p PlayerPos) toWorldPos() WorldPos {
+// 	return WorldPos{
+// 		X: int(p.X),
+// 		Y: int(p.Y),
+// 	}
+// }
 
-type Player interface {
-	Head() PlayerPos
-	SetHead(PlayerPos)
-	EstimateHeadFutureLocation(time.Duration) PlayerPos
-	ApplyPhysics(time.Duration) PlayerPos
-	Uid() Uid
-	Color() color.RGBA
-}
+// type Player interface {
+// 	Head() PlayerPos
+// 	SetHead(PlayerPos)
+// 	EstimateHeadFutureLocation(time.Duration) PlayerPos
+// 	ApplyPhysics(time.Duration) PlayerPos
+// 	Uid() Uid
+// 	Color() color.RGBA
+// }
 
 type Uid = string
+type Player = players.Player
 
 // type ObjectInWorld interface {
 // 	//IsCollided(other ObjectInWorld, pos WorldPos) bool
@@ -41,12 +43,12 @@ type Uid = string
 // 	Color() color.RGBA
 // }
 
-func (wp WorldPos) toPlayerPos() PlayerPos {
-	return PlayerPos{
-		X: float64(wp.X),
-		Y: float64(wp.Y),
-	}
-}
+// func (wp WorldPos) toPlayerPos() PlayerPos {
+// 	return PlayerPos{
+// 		X: float64(wp.X),
+// 		Y: float64(wp.Y),
+// 	}
+// }
 
 // func (c *Collision) AddObject(o ObjectInWorld) {
 // 	if ()

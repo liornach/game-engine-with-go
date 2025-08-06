@@ -14,5 +14,3 @@ func (w World) At(wp WorldPos) (WorldObject, bool) {
 	ret, ok := w.world[wp]
 	return *ret, ok
 }
-
-func (w World) 

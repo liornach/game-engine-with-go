@@ -9,6 +9,13 @@ type WorldObject struct {
 	uid   Uid
 }
 
+func NewWorldObject(c color.RGBA, u Uid) WorldObject {
+	return WorldObject{
+		color: c,
+		uid:   u,
+	}
+}
+
 func (w WorldObject) Color() color.RGBA {
 	return w.color
 }
