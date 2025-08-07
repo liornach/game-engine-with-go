@@ -7,24 +7,24 @@ import (
 )
 
 type Collision struct {
-	objectsInvolved ds.Array[Uid]
-	pos             WorldPos
+	objects ds.Array[Uid]
+	pos     WorldPos
 }
 
 func NewCollision(wp WorldPos, uids []Uid) Collision {
-	objectsInvolved := ds.NewArray[Uid]()
+	objects := ds.NewArray[Uid]()
 
 	for _, u := range uids {
-		if objectsInvolved.Contains(u) {
+		if objects.Contains(u) {
 			panic(fmt.Errorf("object with uid %s was given more then once", u))
 		}
 
-		objectsInvolved.Add(u)
+		objects.Add(u)
 	}
 
 	return Collision{
-		objectsInvolved: objectsInvolved,
-		pos:             wp,
+		objects: objects,
+		pos:     wp,
 	}
 }
 
@@ -33,13 +33,13 @@ func (c *Collision) AddObjectInvolved(u Uid) {
 		panic(fmt.Errorf("object with uid is %s already involved", u))
 	}
 
-	c.objectsInvolved.Add(u)
+	c.objects.Add(u)
 }
 
-func (c Collision) ObjectsInvolved() ds.Array[Uid] {
-	return c.objectsInvolved
+func (c Collision) Objects() ds.Array[Uid] {
+	return c.objects
 }
 
 func (c Collision) IsInvolved(u Uid) bool {
-	return c.objectsInvolved.Contains(u)
+	return c.objects.Contains(u)
 }

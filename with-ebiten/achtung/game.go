@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/liornach/game-engine-ebiten/achtung/players"
+	"github.com/liornach/game-engine-ebiten/achtung/ds"
+	"github.com/liornach/game-engine-ebiten/achtung/timer"
 	"github.com/liornach/game-engine-ebiten/achtung/world"
 )
 
@@ -18,59 +19,27 @@ type PlayerPos struct {
 	X, Y float64
 }
 
-// func (p PlayerPos) toWorldPos() WorldPos {
-// 	return WorldPos{
-// 		X: int(p.X),
-// 		Y: int(p.Y),
-// 	}
-// }
-
-// type Player interface {
-// 	Head() PlayerPos
-// 	SetHead(PlayerPos)
-// 	EstimateHeadFutureLocation(time.Duration) PlayerPos
-// 	ApplyPhysics(time.Duration) PlayerPos
-// 	Uid() Uid
-// 	Color() color.RGBA
-// }
-
 type Uid = string
-type Player = players.Player
-
-// type ObjectInWorld interface {
-// 	//IsCollided(other ObjectInWorld, pos WorldPos) bool
-// 	Uid() Uid
-// 	Color() color.RGBA
-// }
-
-// func (wp WorldPos) toPlayerPos() PlayerPos {
-// 	return PlayerPos{
-// 		X: float64(wp.X),
-// 		Y: float64(wp.Y),
-// 	}
-// }
-
-// func (c *Collision) AddObject(o ObjectInWorld) {
-// 	if ()
-// 	c.Objects[o.Uid()] = o
-// }
 
 type Score struct {
-	Player *Player
+	Player Uid
 	Score  int
 }
 
+type Player struct {
+	worldObject world.WorldObject
+	left, right ebiten.Key
+}
+
 type Game struct {
-	backgroundColor color.RGBA
-	borderColor     color.RGBA
-	Players         []Player
-	world           world.World
-	lastUpdate      time.Time
-	xratio, yratio  float64
-	logger          *gameLogger
-	warmupsCount    int
-	//velocity          Velocity
-	//collisions        []Collision
+	backgroundColor   color.RGBA
+	borderColor       color.RGBA
+	Players           ds.Array[*Player]
+	world             world.World
+	xratio, yratio    float64
+	logger            *gameLogger
+	warmupsCount      int
+	timer             timer.Timer
 	state             State
 	inputHandler      inputHandler
 	scores            []Score
@@ -86,18 +55,18 @@ func (g *Game) World() world.World {
 // 	return o, ok
 // }
 
-func (g *Game) EstimatedNextWorldPos(p Player, elapsed time.Duration) WorldPos {
-	return p.EstimateHeadFutureLocation(elapsed).toWorldPos()
-}
+// func (g *Game) EstimatedNextWorldPos(p Player, elapsed time.Duration) WorldPos {
+// 	return p.EstimateHeadFutureLocation(elapsed).toWorldPos()
+// }
 
-func (g *Game) PlayerHead(p Player) WorldPos {
-	return p.Head().toWorldPos()
-}
+// func (g *Game) PlayerHead(p Player) WorldPos {
+// 	return p.Head().toWorldPos()
+// }
 
-func (g *Game) SetPlayerHead(p Player, wp WorldPos) {
-	playerPos := wp.toPlayerPos()
-	p.SetHead(playerPos)
-}
+// func (g *Game) SetPlayerHead(p Player, wp WorldPos) {
+// 	playerPos := wp.toPlayerPos()
+// 	p.SetHead(playerPos)
+// }
 
 func (g *Game) EstimateCollisions(t time.Duration) []Collision {
 	collisions := make(map[WorldPos]*Collision)
@@ -284,20 +253,12 @@ func (g *Game) logCollision(c Collision) {
 	}
 }
 
-func (g *Game) TouchTimer() time.Duration {
-	now := time.Now()
-
-	if g.lastUpdate.IsZero() {
-		g.lastUpdate = now
-	}
-
-	elapsed := now.Sub(g.lastUpdate)
-	g.lastUpdate = now
-	return elapsed
+func (g *Game) Timer() timer.Timer {
+	return g.timer
 }
 
 func (g *Game) ResetTimer() {
-	g.lastUpdate = time.Time{}
+	g.lastUpdate = timer.NewTimer()
 }
 
 func (g *Game) AddCollision(c Collision) {
