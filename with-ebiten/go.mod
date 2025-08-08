@@ -1,4 +1,4 @@
-module github.com/liornach/game-engine-ebiten
+module github.com/liornach/game-engine-with-go
 
 go 1.24.4
 
