@@ -1,14 +1,10 @@
 package states
 
-import (
-	"github.com/liornach/game-engine-ebiten/achtung"
-)
-
 type runningState struct {
 	game *game
 }
 
-type objectInWorld = achtung.ObjectInWorld
+//type objectInWorld = achtung.ObjectInWorld
 
 func (rs runningState) Update(g *game) (bool, state) {
 	rs.game = g
@@ -16,7 +12,8 @@ func (rs runningState) Update(g *game) (bool, state) {
 		panic("game has an unhandled collisions")
 	}
 
-	elapsed := g.TouchTimer()
+	timer := g.Timer()
+	elapsed := timer.Touch()
 
 	for _, p := range g.Players {
 		nextWorldPos := g.EstimatedNextWorldPos(p, elapsed)

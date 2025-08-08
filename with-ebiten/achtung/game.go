@@ -3,10 +3,10 @@ package achtung
 import (
 	"fmt"
 	"image/color"
-	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/liornach/game-engine-ebiten/achtung/ds"
+	"github.com/liornach/game-engine-ebiten/achtung/physics"
 	"github.com/liornach/game-engine-ebiten/achtung/timer"
 	"github.com/liornach/game-engine-ebiten/achtung/world"
 )
@@ -27,14 +27,14 @@ type Score struct {
 }
 
 type Player struct {
-	worldObject world.WorldObject
-	left, right ebiten.Key
+	uid         Uid
+	stateVector physics.StateVector
 }
 
 type Game struct {
 	backgroundColor   color.RGBA
 	borderColor       color.RGBA
-	Players           ds.Array[*Player]
+	Players           ds.Array[Player]
 	world             world.World
 	xratio, yratio    float64
 	logger            *gameLogger
@@ -42,78 +42,18 @@ type Game struct {
 	timer             timer.Timer
 	state             State
 	inputHandler      inputHandler
-	scores            []Score
-	eliminatedPlayers []Uid
+	scores            ds.Array[Score]
+	eliminatedPlayers ds.Array[Uid]
 }
 
 func (g *Game) World() world.World {
 	return g.world
 }
 
-// func (g *Game) PosOwner(wp WorldPos) (ObjectInWorld, bool) {
-// 	o, ok := g.world[wp]
-// 	return o, ok
-// }
-
-// func (g *Game) EstimatedNextWorldPos(p Player, elapsed time.Duration) WorldPos {
-// 	return p.EstimateHeadFutureLocation(elapsed).toWorldPos()
-// }
-
-// func (g *Game) PlayerHead(p Player) WorldPos {
-// 	return p.Head().toWorldPos()
-// }
-
-// func (g *Game) SetPlayerHead(p Player, wp WorldPos) {
-// 	playerPos := wp.toPlayerPos()
-// 	p.SetHead(playerPos)
-// }
-
-func (g *Game) EstimateCollisions(t time.Duration) []Collision {
-	collisions := make(map[WorldPos]*Collision)
-
-	for _, p := range g.Players {
-		if g.IsEliminated(p.Uid()) {
-			continue
-		}
-
-		futureHead := p.EstimateHeadFutureLocation(t).toWorldPos()
-		if futureHead == p.Head().toWorldPos() {
-			continue
-		}
-
-		if g.IsPosFree(futureHead) {
-			if col, ok := collisions[futureHead]; ok {
-				col.Objects = append(col.Objects, p)
-			}
-		}
-
+func (g *Game) SetPlayer(p Player) {
+	if g.IsEliminated(p) {
+		panic("player is eliminated")
 	}
-}
-
-func (g *Game) ApplyPhysicsToPlayer(p Player, t time.Duration) {
-	p.ApplyPhysics(t)
-}
-
-func (g *Game) IsPlayerHeadAt(p *Player, wp WorldPos) bool {
-	return g.PlayerHead(p) == wp
-}
-
-func (g *Game) IsPosOwnedBy(wp WorldPos, o ObjectInWorld) bool {
-	exist, ok := g.PosOwner(wp)
-	if !ok {
-		return false
-	}
-
-	return exist.Uid() == o.Uid()
-}
-
-func (g *Game) IsPosFree(wp WorldPos) bool {
-	_, ok := g.PosOwner(wp)
-	return !ok
-}
-
-func (g *Game) SetPosOwner(wp WorldPos, o ObjectInWorld) {
-	g.world[wp] = o
 }
 
 func NewGame(xratio, yratio float64, bg, border color.RGBA, initialState State) (*Game, error) {
@@ -131,30 +71,33 @@ func NewGame(xratio, yratio float64, bg, border color.RGBA, initialState State) 
 
 	return &Game{
 		backgroundColor:   bg,
-		Players:           []Player{},
-		world:             make(map[WorldPos]ObjectInWorld),
-		lastUpdate:        time.Time{},
+		Players:           ds.NewArray[*Player](),
+		world:             world.NewWorld(),
+		timer:             timer.NewTimer(),
 		xratio:            xratio,
 		yratio:            yratio,
 		logger:            logger,
 		warmupsCount:      0,
 		borderColor:       border,
-		collisions:        []Collision{},
 		state:             initialState,
-		inputHandler:      inputHandler{},
-		scores:            []Score{},
-		eliminatedPlayers: []Uid{},
+		scores:            ds.NewArray[Score](),
+		eliminatedPlayers: ds.NewArray[Uid](),
 	}, nil
 }
 
-func (g *Game) IsRegistered(puid Uid) bool {
-	for _, registered := range g.Players {
-		if registered.Uid() == puid {
-			return true
+func (g *Game) PlayersIter() <-chan Player {
+	ch := make(chan Player)
+	go func() {
+		for v := range g.Players.Iter() {
+			ch <- *v
 		}
-	}
+		close(ch)
+	}()
+	return ch
+}
 
-	return false
+func (g *Game) IsRegistered(puid Uid) bool {
+	return g.Players.ContainsFunc(func(p *Player) bool { return p.uid == puid })
 }
 
 func (g *Game) IsEliminated(p Uid) bool {
@@ -162,28 +105,22 @@ func (g *Game) IsEliminated(p Uid) bool {
 		panic("player is not registered")
 	}
 
-	for _, eliminated := range g.eliminatedPlayers {
-		if eliminated == p {
-			return true
-		}
-	}
-
-	return false
+	return g.eliminatedPlayers.Contains(p)
 }
 
 func (g *Game) RegisterPlayer(newP Player) error {
-	if len(g.Players) == 2 {
+	if g.Players.Len() == 2 {
 		return fmt.Errorf("currently only 2 max players are allowed")
 	}
 
-	if g.IsRegistered(newP.Uid()) {
-		err := fmt.Errorf("player with uid %s already exist", newP.Uid())
+	if g.IsRegistered(newP.uid) {
+		err := fmt.Errorf("player with uid %s already exist", newP.uid)
 		panic(err)
 	}
 
-	for _, existP := range g.Players {
-		if existP.color() == newP.color() {
-			return fmt.Errorf("player with color %v already exist", existP.color())
+	for existP := range g.Players.Iter() {
+		if existP.color == newP.color {
+			return fmt.Errorf("player with color %v already exist", existP.color)
 		}
 	}
 
@@ -197,7 +134,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	w := screen.Bounds().Dx()
 	h := screen.Bounds().Dy()
 
-	for pos, objInWorld := range g.world {
+	for pos, objInWorld := range g.world. {
 		xpix := int(float64(pos.X) * g.xratio)
 		ypix := int(float64(pos.Y) * g.yratio)
 
