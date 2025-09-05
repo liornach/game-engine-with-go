@@ -9,5 +9,8 @@ import (
 func main() {
 	fmt.Println("hello world")
 	game := achtung.Game{}
-	ebiten.RunGame(&game)
+	err := ebiten.RunGame(&game)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 }

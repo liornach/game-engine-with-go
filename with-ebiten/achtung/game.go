@@ -4,6 +4,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2"
 	"slices"
+	"sync"
 )
 
 
@@ -11,44 +12,81 @@ type coord struct {
 	x, y int
 }
 
-type Game struct {
-	players []*player
+type game struct {
+	// todo : find a proper ds to store both []*Player (players) and board, in term of iterating the board to find collision
+	players []*Player
 	board map[coord]Color
+	maxCoord, minCoord coord
+	initOnce sync.Once
+	isRunning bool
+	initMutex sync.Mutex
 }
 
-func (g *Game) Update() error {
+func NewGame() *game {
+	return &game{
+		players: []*Player,
+		board : make(map[coord]Color)
+	}
+}
+
+func (g *game) Update() error {
+	g.initOnce.Do(func(){
+		if isRunning {
+			return errors.New("game has already been initialized, why do it twice?")
+		}
+		initMutex.Lock()
+		defer initMutex.Unlock()
+		g.initPlayersLocationAndVelocity()
+		isRunning = true
+	})
+
+	for i := range g.players {
+			
+	}
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
+
+func (g *game) updatePlayersLocation(ticks int) []collision {
+	var colls []collision
+	for i := range g.players {
+
+	}
+
+}
+
+func (g *game) initPlayersLocationAndVelocity() {
+	if len(g.players) != 2 {
+		panic("currently supports only 2 players")
+	}
+
+	c := g.minCoord
+	for i := range g.players {
+		c = coord{
+			x : c.x + 33,
+			y : c.y + 66,
+		}
+		g.players[i].x = float64(c.x)
+		g.players[i].y = float64(c.y)
+		g.players[i].vx = 20
+		g.players[i].vy = 20
+	}
+}
+		
+
+func (g *game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, "hello world")
 }
 
-func (g *Game) Layout(outWidth, outHeight int) (screenWidth, screenHeight int) {
+func (g *game) Layout(outWidth, outHeight int) (screenWidth, screenHeight int) {
 	return outWidth, outHeight 
 }
 
-func (g *Game) AddPlayer(c Color, left, right ebiten.Key) bool {
-	if slices.ContainsFunc(g.players ,func(p *Player) bool { return p.color == c}) {
+func (g *game) AddPlayer(c Color, Left, Right ebiten.Key) bool {
+	if slices.ContainsFunc(g.players ,func(p *Player) bool { return p.Color == c}) {
 		return false
 	}
 	
-	g.players = append(g.players, player{...})
-}
-	
-
-
-
-type Color = int
-const (
-	Red Color = 0XFF0000
-	Green Color = 0X00FF00
-	Blue Color = 0X0000FF
-)
-
-type player struct {
-	color Color
-	left, right ebiten.Key
-	x, y float64
-	vx, vy float64
+	g.players = append(g.players, &Player{Color : c, Left : Left, Right : Right})
+	return true
 }
